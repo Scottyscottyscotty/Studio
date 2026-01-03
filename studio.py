@@ -82,7 +82,8 @@ class StudioApp(rumps.App):
         ]
 
         # Set up global hotkey (Option+Space)
-        self.setup_global_hotkey()
+        # Temporarily disabled due to pynput compatibility issue with Python 3.13
+        # self.setup_global_hotkey()
 
     def setup_global_hotkey(self):
         """Setup global keyboard shortcut for activating listening"""
@@ -158,6 +159,7 @@ class StudioApp(rumps.App):
 
     def start_recording(self, sender):
         """Start recording audio"""
+        print("[DEBUG] Start listening clicked")
         self.is_recording = True
         sender.title = "Stop Listening ⏹"
         self._update_status("Listening...")
@@ -168,6 +170,7 @@ class StudioApp(rumps.App):
 
     def stop_recording(self, sender):
         """Stop recording and process the audio"""
+        print("[DEBUG] Stop listening clicked")
         self.is_recording = False
         sender.title = "Start Listening ⏺"
         self._update_status("Processing...")
@@ -224,6 +227,8 @@ class StudioApp(rumps.App):
     def _process_recording(self):
         """Process the recorded audio through Whisper API"""
         try:
+            print(f"\n[DEBUG] Processing {len(self.audio_frames)} audio frames...")
+
             # Save the recording to a file
             audio_file_path = self.recordings_dir / "temp_recording.wav"
 
@@ -234,7 +239,10 @@ class StudioApp(rumps.App):
             wf.writeframes(b''.join(self.audio_frames))
             wf.close()
 
+            print(f"[DEBUG] Audio saved to: {audio_file_path}")
+
             # Send to OpenAI Whisper API
+            print("[DEBUG] Sending to Whisper API...")
             with open(audio_file_path, 'rb') as audio_file:
                 transcript = self.openai_client.audio.transcriptions.create(
                     model="whisper-1",
@@ -243,11 +251,13 @@ class StudioApp(rumps.App):
                 )
 
             transcribed_text = transcript.text.strip()
+            print(f"[DEBUG] Transcribed: '{transcribed_text}'")
 
             # Parse and execute the command
             if transcribed_text:
                 self._execute_command(transcribed_text)
             else:
+                print("[DEBUG] No speech detected")
                 self._update_status("No speech detected")
                 if self.continuous_mode:
                     # Restart listening in continuous mode
@@ -267,20 +277,27 @@ class StudioApp(rumps.App):
     def _execute_command(self, transcribed_text):
         """Parse and execute the voice command"""
         try:
+            print(f"[DEBUG] Parsing command: '{transcribed_text}'")
+
             # Parse the command
             command = self.command_parser.parse(transcribed_text)
 
             if command:
+                print(f"[DEBUG] Command parsed: action='{command.action}', params={command.params}")
+
                 # Save to history
                 self.last_command = (transcribed_text, command)
                 self.command_history.append(self.last_command)
 
                 # Execute the command
+                print(f"[DEBUG] Executing command in Capture One...")
                 success = self.capture_one.execute(command)
+                print(f"[DEBUG] Execution result: {success}")
 
                 if success:
                     # Voice feedback
                     feedback_msg = self._get_command_feedback(command)
+                    print(f"[DEBUG] Feedback: {feedback_msg}")
                     self._speak(feedback_msg)
 
                     rumps.notification(
@@ -290,6 +307,7 @@ class StudioApp(rumps.App):
                     )
                     self._update_status("Command executed")
                 else:
+                    print("[DEBUG] Command execution failed")
                     self._speak("Command failed")
                     rumps.notification(
                         "Studio",
@@ -298,6 +316,7 @@ class StudioApp(rumps.App):
                     )
                     self._update_status("Execution failed")
             else:
+                print(f"[DEBUG] Command not recognized: '{transcribed_text}'")
                 self._speak("Command not recognized")
                 rumps.notification(
                     "Studio",
