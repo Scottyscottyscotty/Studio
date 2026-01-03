@@ -28,7 +28,7 @@ class StudioApp(rumps.App):
     def __init__(self):
         super(StudioApp, self).__init__(
             "Studio",
-            icon="📷",  # Camera emoji as placeholder, can be replaced with custom icon
+            icon=None,  # Will show "Studio" text in menu bar
             quit_button=None
         )
 
@@ -148,7 +148,7 @@ class StudioApp(rumps.App):
 
         self.is_recording = True
         self._update_status("Listening...")
-        self.icon = "🎤"
+        self.title = "Studio 🎤"
 
         # Start recording in a separate thread
         threading.Thread(target=self._record_audio, daemon=True).start()
@@ -158,7 +158,7 @@ class StudioApp(rumps.App):
         self.is_recording = True
         sender.title = "Stop Listening ⏹"
         self._update_status("Listening...")
-        self.icon = "🎤"
+        self.title = "Studio 🎤"
 
         # Start recording in a separate thread
         threading.Thread(target=self._record_audio, daemon=True).start()
@@ -168,7 +168,7 @@ class StudioApp(rumps.App):
         self.is_recording = False
         sender.title = "Start Listening ⏺"
         self._update_status("Processing...")
-        self.icon = "⏳"
+        self.title = "Studio ⏳"
 
         # Process the recording in a separate thread
         threading.Thread(target=self._process_recording, daemon=True).start()
@@ -395,7 +395,14 @@ class StudioApp(rumps.App):
 
     def _update_status(self, message="Ready"):
         """Update the app status"""
-        self.icon = "📷" if message in ["Ready", "Command executed"] else "🎤" if "Listening" in message else "⏳"
+        # Update title to show status (since we can't use emoji icons)
+        if "Listening" in message:
+            self.title = "Studio 🎤"
+        elif message in ["Ready", "Command executed"]:
+            self.title = "Studio"
+        else:
+            self.title = "Studio ⏳"
+
         for item in self.menu.values():
             if item.title.startswith("Status:"):
                 item.title = f"Status: {message}"
