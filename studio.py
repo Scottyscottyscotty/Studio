@@ -44,6 +44,7 @@ class StudioApp(rumps.App):
         self.openai_client = OpenAI(api_key=api_key, timeout=30.0)
 
         # Test API key validity at startup
+        print(f"[DEBUG] API key loaded: {api_key[:20]}...{api_key[-4:]}")
         print("[DEBUG] Testing OpenAI API connection...")
         try:
             # Quick test with models endpoint
@@ -270,9 +271,10 @@ class StudioApp(rumps.App):
             try:
                 with open(audio_file_path, 'rb') as audio_file:
                     print(f"[DEBUG] File opened, calling API...")
+                    # Pass file as tuple: (filename, file_object)
                     transcript = self.openai_client.audio.transcriptions.create(
                         model="whisper-1",
-                        file=audio_file,
+                        file=("recording.wav", audio_file, "audio/wav"),
                         language="en"
                     )
                     elapsed = time.time() - start_time
