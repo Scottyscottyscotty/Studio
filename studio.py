@@ -153,6 +153,9 @@ class StudioApp(rumps.App):
         # Start recording in a separate thread
         threading.Thread(target=self._record_audio, daemon=True).start()
 
+        # Auto-stop after 5 seconds for programmatic recording
+        threading.Timer(5.0, self._stop_recording_programmatic).start()
+
     def start_recording(self, sender):
         """Start recording audio"""
         self.is_recording = True
@@ -167,6 +170,18 @@ class StudioApp(rumps.App):
         """Stop recording and process the audio"""
         self.is_recording = False
         sender.title = "Start Listening ⏺"
+        self._update_status("Processing...")
+        self.title = "Studio ⏳"
+
+        # Process the recording in a separate thread
+        threading.Thread(target=self._process_recording, daemon=True).start()
+
+    def _stop_recording_programmatic(self):
+        """Auto-stop recording and process (for hotkey/continuous mode)"""
+        if not self.is_recording:
+            return
+
+        self.is_recording = False
         self._update_status("Processing...")
         self.title = "Studio ⏳"
 
