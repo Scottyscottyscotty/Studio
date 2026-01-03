@@ -43,6 +43,19 @@ class StudioApp(rumps.App):
 
         self.openai_client = OpenAI(api_key=api_key, timeout=30.0)
 
+        # Test API key validity at startup
+        print("[DEBUG] Testing OpenAI API connection...")
+        try:
+            # Quick test with models endpoint
+            self.openai_client.models.list()
+            print("[DEBUG] OpenAI API connection successful!")
+        except Exception as e:
+            print(f"[DEBUG] OpenAI API test failed: {e}")
+            rumps.alert(
+                "OpenAI API Error",
+                f"Failed to connect to OpenAI API: {str(e)}"
+            )
+
         # Initialize components
         self.command_parser = CommandParser()
         self.capture_one = CaptureOneController()
@@ -250,16 +263,30 @@ class StudioApp(rumps.App):
             print(f"[DEBUG] Audio saved to: {audio_file_path} (size: {file_size} bytes)")
 
             # Send to OpenAI Whisper API
-            print("[DEBUG] Sending to Whisper API...")
-            with open(audio_file_path, 'rb') as audio_file:
-                transcript = self.openai_client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file,
-                    language="en"
-                )
+            print(f"[DEBUG] Sending to Whisper API... (timeout: 30s)")
+            import time
+            start_time = time.time()
 
-            transcribed_text = transcript.text.strip()
-            print(f"[DEBUG] Transcribed: '{transcribed_text}'")
+            try:
+                with open(audio_file_path, 'rb') as audio_file:
+                    print(f"[DEBUG] File opened, calling API...")
+                    transcript = self.openai_client.audio.transcriptions.create(
+                        model="whisper-1",
+                        file=audio_file,
+                        language="en"
+                    )
+                    elapsed = time.time() - start_time
+                    print(f"[DEBUG] API call completed in {elapsed:.2f}s")
+
+                print(f"[DEBUG] Response type: {type(transcript)}")
+                print(f"[DEBUG] Response: {transcript}")
+
+                transcribed_text = transcript.text.strip()
+                print(f"[DEBUG] Transcribed: '{transcribed_text}'")
+            except Exception as api_error:
+                elapsed = time.time() - start_time
+                print(f"[DEBUG] API call failed after {elapsed:.2f}s: {type(api_error).__name__}: {str(api_error)}")
+                raise
 
             # Parse and execute the command
             if transcribed_text:
