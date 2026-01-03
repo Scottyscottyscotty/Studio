@@ -12,15 +12,20 @@ Studio is a macOS menu bar application that provides voice control for Capture O
 
 ## 💬 Example Commands
 
-- "Studio, delete the last 4 images"
-- "Studio, mark the last image as 5 stars"
-- "Studio, rate the last 3 images as 4 stars"
-- "Studio, label this image as red"
-- "Studio, select all images with red labels"
-- "Studio, export the current image"
-- "Studio, next image"
-- "Studio, flag this photo"
-- "Studio, increase the exposure by 10"
+**90+ voice commands with natural language understanding!**
+
+- "Studio, delete the last 4 images" or "trash that picture"
+- "Studio, mark the last image as 5 stars" or "give this photo 4 stars"
+- "Studio, label this image as red" or "tag that pic as blue"
+- "Studio, select the last 10 photos" or "choose all"
+- "Studio, export the current image" or "save these shots"
+- "Studio, next image" or "go back"
+- "Studio, flag this photo" or "favorite that image"
+- "Studio, rotate left" or "flip horizontal"
+- "Studio, auto adjust" or "zoom to fit"
+- "Studio, copy adjustments" or "show fullscreen"
+
+**See [COMMANDS.md](COMMANDS.md) for the complete list of all 90+ commands!**
 
 ## 📋 Requirements
 
@@ -108,49 +113,49 @@ If you prefer to set up manually:
 
 ## 📝 Supported Commands
 
-### Rating Commands
-- "Mark/rate/set the last image as [1-5] stars"
-- "Rate the last [N] images as [1-5] stars"
-- "Rate this image as [1-5] stars"
+**Studio now supports 90+ voice commands across 15 categories with flexible natural language understanding!**
 
-### Color Label Commands
-- "Label/mark/tag this image as [color]"
-- "Label the last [N] images as [color]"
-- Colors: red, orange, yellow, green, blue, purple, white
+### Command Categories
 
-### Selection Commands
-- "Select all images with [color] label"
-- "Select all [1-5] star images"
-- "Select the last [N] images"
-- "Select all"
-- "Deselect all"
+1. **Delete** - Remove images with natural phrases
+2. **Rating** - 1-5 star ratings with semantic flexibility
+3. **Color Labels** - 7 colors (red, orange, yellow, green, blue, purple, white)
+4. **Selection** - Multiple ways to select images
+5. **Export** - Save images in various ways
+6. **Adjustments** - Exposure, contrast, saturation, auto-adjust, reset
+7. **Navigation** - Next, previous, first, last image
+8. **Flag** - Mark favorites
+9. **Reject** - Mark bad images
+10. **Crop** - Full crop workflow
+11. **Rotation** - Rotate and flip
+12. **Copy/Paste** - Transfer settings between images
+13. **View** - Fullscreen, zoom controls
+14. **Comparison** - Before/after views
+15. **Focus** - Focus mask display
 
-### Delete Commands
-- "Delete the last [N] images"
-- "Delete the current/selected image"
+### Natural Language Examples
 
-### Export Commands
-- "Export the current/selected images"
-- "Export the last [N] images"
+Studio understands natural variations - say it your way:
+- "delete" = remove, trash, discard, get rid of
+- "image" = photo, picture, shot, pic
+- "this/that/these/those" = current, selected
+- "increase" = raise, boost, bump up, turn up
+- "flag" = star, favorite, fav
 
-### Navigation Commands
-- "Next image"
-- "Previous image"
+### Complete Command Reference
 
-### Flag Commands
-- "Flag this image"
-- "Unflag this image"
-- "Reject this image"
+For the full list of all commands and their variations, see **[COMMANDS.md](COMMANDS.md)**
 
-### Crop Commands
-- "Enable/start crop"
-- "Apply crop"
-- "Cancel/disable crop"
+### Quick Examples by Category
 
-### Adjustment Commands
-- "Increase/raise/boost the exposure by [N]"
-- "Decrease/lower/reduce the exposure by [N]"
-- "Reset all adjustments"
+**Delete:** "trash that picture", "remove the last 3 photos"
+**Rating:** "give this 5 stars", "rate last image as 4 stars"
+**Labels:** "tag as blue", "mark this pic red"
+**Selection:** "choose all", "pick the last 10 shots"
+**Navigation:** "go back", "next", "jump to first image"
+**Adjustments:** "auto adjust", "boost exposure by 10"
+**View:** "show fullscreen", "zoom to fit"
+**Copy/Paste:** "copy adjustments", "paste style"
 
 ## ⚙️ Configuration
 

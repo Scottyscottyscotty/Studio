@@ -19,19 +19,56 @@ class CaptureOneController:
         # Keyboard shortcuts for common actions
         # These match default Capture One shortcuts
         self.shortcuts = {
+            # Basic operations
             'delete': 'delete',
             'next_image': 'right arrow',
             'previous_image': 'left arrow',
+            'first_image': 'home',
+            'last_image': 'end',
+
+            # Selection
             'select_all': 'command down & a & command up',
             'deselect_all': 'escape',
+
+            # Export
             'export': 'command down & shift down & e & shift up & command up',
+
+            # Flag/Reject
             'flag': 'slash',
             'unflag': 'slash',
             'reject': 'command down & delete & command up',
+
+            # Crop
             'crop_enable': 'c',
             'crop_apply': 'return',
             'crop_cancel': 'escape',
+            'reset_crop': 'command down & z & command up',  # Undo after entering crop
+
+            # Rotation
+            'rotate_left': 'l',
+            'rotate_right': 'r',
+
+            # Adjustments
             'reset_all': 'command down & shift down & r & shift up & command up',
+            'auto_adjust': 'command down & d & command up',
+
+            # Copy/Paste
+            'copy_adjustments': 'command down & shift down & c & shift up & command up',
+            'paste_adjustments': 'command down & shift down & v & shift up & command up',
+
+            # View
+            'fullscreen': 'f',
+            'zoom_to_fit': 'command down & 0 & command up',
+            'zoom_100': 'command down & option down & 0 & option up & command up',
+            'zoom_in': 'command down & plus & command up',
+            'zoom_out': 'command down & minus & command up',
+
+            # Comparison
+            'compare': 'option down & return & option up',
+            'before_after': 'b',
+
+            # Focus
+            'focus_mask': 'command down & shift down & f & shift up & command up',
         }
 
         # Star ratings keyboard shortcuts (1-5)
@@ -66,60 +103,150 @@ class CaptureOneController:
         """
         try:
             # Route to the appropriate handler based on action
-            if command.action == 'delete_last':
+            action = command.action
+
+            # Delete commands
+            if action == 'delete_last':
                 return self._delete_last(command.params.get('count', 1))
-            elif command.action == 'delete_selected':
+            elif action == 'delete_selected':
                 return self._delete_selected()
-            elif command.action == 'rate_last':
+
+            # Rating commands
+            elif action == 'rate_last':
                 return self._rate_last(
                     command.params.get('count', 1),
                     command.params.get('rating')
                 )
-            elif command.action == 'rate_selected':
+            elif action == 'rate_selected':
                 return self._rate_selected(command.params.get('rating'))
-            elif command.action == 'label_last':
+
+            # Label commands
+            elif action == 'label_last':
                 return self._label_last(
                     command.params.get('count', 1),
                     command.params.get('color')
                 )
-            elif command.action == 'label_selected':
+            elif action == 'label_selected':
                 return self._label_selected(command.params.get('color'))
-            elif command.action == 'select_by_color':
+            elif action == 'remove_label':
+                return self._remove_label()
+
+            # Selection commands
+            elif action == 'select_by_color':
                 return self._select_by_color(command.params.get('color'))
-            elif command.action == 'select_by_rating':
+            elif action == 'select_by_rating':
                 return self._select_by_rating(command.params.get('rating'))
-            elif command.action == 'select_last':
+            elif action == 'select_last':
                 return self._select_last(command.params.get('count'))
-            elif command.action == 'select_all':
+            elif action == 'select_first':
+                return self._select_first(command.params.get('count'))
+            elif action == 'select_all':
                 return self._press_shortcut('select_all')
-            elif command.action == 'deselect_all':
+            elif action == 'deselect_all':
                 return self._press_shortcut('deselect_all')
-            elif command.action == 'export_selected':
+            elif action == 'select_flagged':
+                return self._select_flagged()
+            elif action == 'select_rejected':
+                return self._select_rejected()
+
+            # Export commands
+            elif action == 'export_selected':
                 return self._press_shortcut('export')
-            elif command.action == 'export_last':
+            elif action == 'export_last':
                 return self._export_last(command.params.get('count'))
-            elif command.action == 'adjust_exposure':
+            elif action == 'export_all':
+                return self._export_all()
+
+            # Adjustment commands
+            elif action == 'adjust_exposure':
                 return self._adjust_exposure(command.params.get('amount'))
-            elif command.action == 'reset_adjustments':
+            elif action == 'adjust_contrast':
+                return self._adjust_contrast(command.params.get('amount'))
+            elif action == 'adjust_saturation':
+                return self._adjust_saturation(command.params.get('amount'))
+            elif action == 'auto_adjust':
+                return self._press_shortcut('auto_adjust')
+            elif action == 'reset_adjustments':
                 return self._press_shortcut('reset_all')
-            elif command.action == 'next_image':
+
+            # Navigation commands
+            elif action == 'next_image':
                 return self._press_shortcut('next_image')
-            elif command.action == 'previous_image':
+            elif action == 'previous_image':
                 return self._press_shortcut('previous_image')
-            elif command.action == 'flag_selected':
+            elif action == 'first_image':
+                return self._press_shortcut('first_image')
+            elif action == 'last_image':
+                return self._press_shortcut('last_image')
+
+            # Flag commands
+            elif action == 'flag_selected':
                 return self._press_shortcut('flag')
-            elif command.action == 'unflag_selected':
+            elif action == 'unflag_selected':
                 return self._press_shortcut('unflag')
-            elif command.action == 'reject_selected':
+            elif action == 'flag_last':
+                return self._flag_last(command.params.get('count'))
+
+            # Reject commands
+            elif action == 'reject_selected':
                 return self._press_shortcut('reject')
-            elif command.action == 'enable_crop':
+            elif action == 'unreject_selected':
+                return self._unreject_selected()
+
+            # Crop commands
+            elif action == 'enable_crop':
                 return self._press_shortcut('crop_enable')
-            elif command.action == 'disable_crop':
+            elif action == 'disable_crop':
                 return self._press_shortcut('crop_cancel')
-            elif command.action == 'apply_crop':
+            elif action == 'apply_crop':
                 return self._press_shortcut('crop_apply')
+            elif action == 'reset_crop':
+                return self._press_shortcut('reset_crop')
+
+            # Rotation commands
+            elif action == 'rotate_left':
+                return self._press_shortcut('rotate_left')
+            elif action == 'rotate_right':
+                return self._press_shortcut('rotate_right')
+            elif action == 'flip_horizontal':
+                return self._flip_horizontal()
+            elif action == 'flip_vertical':
+                return self._flip_vertical()
+
+            # Copy/Paste commands
+            elif action == 'copy_adjustments':
+                return self._press_shortcut('copy_adjustments')
+            elif action == 'paste_adjustments':
+                return self._press_shortcut('paste_adjustments')
+
+            # View commands
+            elif action == 'fullscreen':
+                return self._press_shortcut('fullscreen')
+            elif action == 'exit_fullscreen':
+                return self._press_shortcut('fullscreen')  # Toggle
+            elif action == 'zoom_to_fit':
+                return self._press_shortcut('zoom_to_fit')
+            elif action == 'zoom_100':
+                return self._press_shortcut('zoom_100')
+            elif action == 'zoom_in':
+                return self._press_shortcut('zoom_in')
+            elif action == 'zoom_out':
+                return self._press_shortcut('zoom_out')
+
+            # Comparison commands
+            elif action == 'compare':
+                return self._press_shortcut('compare')
+            elif action == 'before_after':
+                return self._press_shortcut('before_after')
+
+            # Focus commands
+            elif action == 'show_focus_mask':
+                return self._press_shortcut('focus_mask')
+            elif action == 'hide_focus_mask':
+                return self._press_shortcut('focus_mask')  # Toggle
+
             else:
-                print(f"Unknown action: {command.action}")
+                print(f"Unknown action: {action}")
                 return False
 
         except Exception as e:
@@ -392,6 +519,144 @@ class CaptureOneController:
 
         print(f"Exposure adjustment not fully implemented yet. Amount: {amount}")
         return True
+
+    def _adjust_contrast(self, amount: int) -> bool:
+        """Adjust contrast by a specific amount"""
+        # Placeholder for contrast adjustment
+        print(f"Contrast adjustment not fully implemented yet. Amount: {amount}")
+        return True
+
+    def _adjust_saturation(self, amount: int) -> bool:
+        """Adjust saturation by a specific amount"""
+        # Placeholder for saturation adjustment
+        print(f"Saturation adjustment not fully implemented yet. Amount: {amount}")
+        return True
+
+    def _remove_label(self) -> bool:
+        """Remove color label from selected image"""
+        # Press Command+0 to remove label
+        return self._press_key('command down & 0 & command up')
+
+    def _select_first(self, count: int) -> bool:
+        """Select the first N images"""
+        script = f'''
+        tell application "{self.app_name}"
+            activate
+        end tell
+
+        delay 0.1
+
+        tell application "System Events"
+            tell process "{self.app_name}"
+                -- Go to first image
+                key code 115  -- Home key
+                delay 0.1
+
+                -- Select first N images
+                repeat {count - 1} times
+                    keystroke (down arrow) using shift down
+                    delay 0.05
+                end repeat
+            end tell
+        end tell
+        '''
+
+        return self._run_applescript(script)
+
+    def _select_flagged(self) -> bool:
+        """Select all flagged images"""
+        # Placeholder - would use filter panel
+        print("Select flagged images not fully implemented yet")
+        return True
+
+    def _select_rejected(self) -> bool:
+        """Select all rejected images"""
+        # Placeholder - would use filter panel
+        print("Select rejected images not fully implemented yet")
+        return True
+
+    def _export_all(self) -> bool:
+        """Export all images"""
+        # Select all, then export
+        if self._press_shortcut('select_all'):
+            return self._press_shortcut('export')
+        return False
+
+    def _flag_last(self, count: int) -> bool:
+        """Flag the last N images"""
+        script = f'''
+        tell application "{self.app_name}"
+            activate
+        end tell
+
+        delay 0.1
+
+        tell application "System Events"
+            tell process "{self.app_name}"
+                -- Go to last image
+                key code 119  -- End key
+                delay 0.1
+
+                -- Select last N images
+                repeat {count - 1} times
+                    keystroke (up arrow) using shift down
+                    delay 0.05
+                end repeat
+
+                delay 0.1
+
+                -- Flag
+                keystroke slash
+            end tell
+        end tell
+        '''
+
+        return self._run_applescript(script)
+
+    def _unreject_selected(self) -> bool:
+        """Remove reject status from selected image"""
+        # Pressing reject again toggles it off
+        return self._press_shortcut('reject')
+
+    def _flip_horizontal(self) -> bool:
+        """Flip image horizontally"""
+        # Use menu bar access
+        script = f'''
+        tell application "{self.app_name}"
+            activate
+        end tell
+
+        delay 0.1
+
+        tell application "System Events"
+            tell process "{self.app_name}"
+                -- Navigate to Image menu -> Flip -> Horizontal
+                click menu item "Horizontal" of menu "Flip" of menu item "Flip" of menu "Image" of menu bar 1
+            end tell
+        end tell
+        '''
+
+        return self._run_applescript(script)
+
+    def _flip_vertical(self) -> bool:
+        """Flip image vertically"""
+        # Use menu bar access
+        script = f'''
+        tell application "{self.app_name}"
+            activate
+        end tell
+
+        delay 0.1
+
+        tell application "System Events"
+            tell process "{self.app_name}"
+                -- Navigate to Image menu -> Flip -> Vertical
+                click menu item "Vertical" of menu "Flip" of menu item "Flip" of menu "Image" of menu bar 1
+            end tell
+        end tell
+        '''
+
+        return self._run_applescript(script)
 
 
 # Test function
