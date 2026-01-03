@@ -98,15 +98,15 @@ class StudioApp(rumps.App):
         )
 
         def for_canonical(f):
-            return lambda k: f(keyboard_listener.canonical(k))
+            return lambda k: f(self.keyboard_listener.canonical(k))
 
-        keyboard_listener = keyboard.Listener(
+        self.keyboard_listener = keyboard.Listener(
             on_press=for_canonical(hotkey.press),
             on_release=for_canonical(hotkey.release)
         )
 
-        keyboard_listener.daemon = True
-        keyboard_listener.start()
+        self.keyboard_listener.daemon = True
+        self.keyboard_listener.start()
 
     def toggle_continuous_mode(self, sender):
         """Toggle continuous listening mode"""
@@ -462,6 +462,8 @@ class StudioApp(rumps.App):
 
     def quit_app(self, _):
         """Quit the application"""
+        if hasattr(self, 'keyboard_listener'):
+            self.keyboard_listener.stop()
         self.audio.terminate()
         rumps.quit_application()
 
