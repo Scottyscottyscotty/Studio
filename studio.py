@@ -404,7 +404,8 @@ class StudioApp(rumps.App):
             self.title = "Studio ⏳"
 
         for item in self.menu.values():
-            if item.title.startswith("Status:"):
+            # Skip separator items (they don't have a title attribute)
+            if hasattr(item, 'title') and item.title and item.title.startswith("Status:"):
                 item.title = f"Status: {message}"
                 break
 
