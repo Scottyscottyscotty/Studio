@@ -453,19 +453,41 @@ class StudioApp(rumps.App):
         return feedback_map.get(action, "Command executed")
 
     def _speak(self, text):
-        """Speak text using macOS text-to-speech"""
+        """Speak text using OpenAI text-to-speech"""
         if not self.voice_feedback_enabled:
             return
 
         try:
-            # Use macOS say command for voice feedback
+            # Use OpenAI TTS API for voice feedback
+            import tempfile
+            from pathlib import Path
+
+            # Create speech using OpenAI
+            response = self.openai_client.audio.speech.create(
+                model="tts-1",
+                voice="nova",  # Options: alloy, echo, fable, onyx, nova, shimmer
+                input=text,
+                speed=1.2  # Slightly faster for quick feedback
+            )
+
+            # Save to temporary file and play
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as temp_file:
+                temp_file.write(response.content)
+                temp_path = temp_file.name
+
+            # Play the audio file using afplay (macOS)
             subprocess.Popen(
-                ['say', '-v', 'Samantha', '-r', '200', text],
+                ['afplay', temp_path],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
             )
-        except Exception:
-            pass  # Silently fail if say command unavailable
+
+            # Clean up temp file after a delay
+            threading.Timer(5.0, lambda: Path(temp_path).unlink(missing_ok=True)).start()
+
+        except Exception as e:
+            print(f"[DEBUG] TTS error: {e}")
+            pass  # Silently fail if TTS unavailable
 
     def _update_status(self, message="Ready"):
         """Update the app status"""

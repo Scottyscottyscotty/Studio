@@ -62,6 +62,14 @@ class CommandParser:
         """Get synonym pattern for a key"""
         return self.synonyms.get(key, key)
 
+    def _word_to_number(self, word: str) -> int:
+        """Convert word numbers to integers"""
+        word_map = {
+            'zero': 0, 'one': 1, 'two': 2, 'three': 3, 'four': 4,
+            'five': 5, 'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
+        }
+        return word_map.get(word.lower(), 0)
+
     def _build_patterns(self) -> list:
         """Build all command patterns with semantic flexibility"""
         return [
@@ -102,6 +110,12 @@ class CommandParser:
                 'pattern': rf'(?:unrate|remove rating|clear rating)\s+(?:the\s+)?{self._s("selected")}\s+{self._s("image")}',
                 'action': 'rate_selected',
                 'params': lambda m: {'rating': 0}
+            },
+            # Word number ratings: "mark this five stars"
+            {
+                'pattern': rf'{self._s("mark")}\s+{self._s("selected")}\s+(zero|one|two|three|four|five)\s+star',
+                'action': 'rate_selected',
+                'params': lambda m: {'rating': self._word_to_number(m.group(1))}
             },
 
             # ============================================================
