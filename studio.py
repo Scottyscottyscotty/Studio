@@ -175,6 +175,7 @@ class StudioApp(rumps.App):
         """Start recording audio"""
         print("[DEBUG] Start listening clicked")
         self.is_recording = True
+        self.menu_recording_sender = sender  # Store sender for auto-stop
         sender.title = "Stop Listening ⏹"
         self._update_status("Listening...")
         self.title = "Studio 🎤"
@@ -182,11 +183,32 @@ class StudioApp(rumps.App):
         # Start recording in a separate thread
         threading.Thread(target=self._record_audio, daemon=True).start()
 
+        # Auto-stop after 10 seconds for menu-based recording
+        threading.Timer(10.0, self._auto_stop_menu_recording).start()
+
     def stop_recording(self, sender):
         """Stop recording and process the audio"""
         print("[DEBUG] Stop listening clicked")
         self.is_recording = False
         sender.title = "Start Listening ⏺"
+        self._update_status("Processing...")
+        self.title = "Studio ⏳"
+
+        # Process the recording in a separate thread
+        threading.Thread(target=self._process_recording, daemon=True).start()
+
+    def _auto_stop_menu_recording(self):
+        """Auto-stop menu-based recording after timeout"""
+        if not self.is_recording:
+            return
+
+        print("[DEBUG] Auto-stopping menu recording after 10 seconds")
+        self.is_recording = False
+
+        # Update menu item if we have the sender
+        if hasattr(self, 'menu_recording_sender') and self.menu_recording_sender:
+            self.menu_recording_sender.title = "Start Listening ⏺"
+
         self._update_status("Processing...")
         self.title = "Studio ⏳"
 

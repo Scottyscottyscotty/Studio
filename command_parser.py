@@ -117,6 +117,12 @@ class CommandParser:
                 'action': 'rate_selected',
                 'params': lambda m: {'rating': self._word_to_number(m.group(1))}
             },
+            # Digit ratings with "this/that": "mark this 5 stars"
+            {
+                'pattern': rf'{self._s("mark")}\s+{self._s("selected")}\s+(\d+)\s+star',
+                'action': 'rate_selected',
+                'params': lambda m: {'rating': int(m.group(1))}
+            },
 
             # ============================================================
             # COLOR LABEL COMMANDS
