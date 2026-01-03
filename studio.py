@@ -41,7 +41,7 @@ class StudioApp(rumps.App):
             )
             sys.exit(1)
 
-        self.openai_client = OpenAI(api_key=api_key)
+        self.openai_client = OpenAI(api_key=api_key, timeout=30.0)
 
         # Initialize components
         self.command_parser = CommandParser()
@@ -229,6 +229,12 @@ class StudioApp(rumps.App):
         try:
             print(f"\n[DEBUG] Processing {len(self.audio_frames)} audio frames...")
 
+            # Check if we have audio data
+            if not self.audio_frames or len(self.audio_frames) == 0:
+                print("[DEBUG] No audio frames captured")
+                self._update_status("No audio recorded")
+                return
+
             # Save the recording to a file
             audio_file_path = self.recordings_dir / "temp_recording.wav"
 
@@ -239,7 +245,9 @@ class StudioApp(rumps.App):
             wf.writeframes(b''.join(self.audio_frames))
             wf.close()
 
-            print(f"[DEBUG] Audio saved to: {audio_file_path}")
+            # Check file size
+            file_size = audio_file_path.stat().st_size
+            print(f"[DEBUG] Audio saved to: {audio_file_path} (size: {file_size} bytes)")
 
             # Send to OpenAI Whisper API
             print("[DEBUG] Sending to Whisper API...")
@@ -264,6 +272,9 @@ class StudioApp(rumps.App):
                     threading.Timer(0.5, self.start_recording_programmatic).start()
 
         except Exception as e:
+            print(f"[DEBUG] Error processing recording: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
             rumps.notification(
                 "Studio Error",
                 "Processing Error",
