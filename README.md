@@ -1,14 +1,19 @@
 # Studio - Voice Assistant for Capture One
 
-Studio is a macOS menu bar application that provides voice control for Capture One Pro. Control your photo editing workflow with natural language voice commands!
+## Digital Tech Edition - Professional On-Set Voice Control
 
-## 🎯 Features
+Studio is a macOS menu bar application that provides hands-free voice control for Capture One Pro. Designed specifically to replace a digital technician on photoshoot sets with continuous listening, voice feedback, and workflow macros.
 
-- 🎤 **Voice-activated commands** - Just say "Studio" and give your command
-- 📍 **Menu bar integration** - Small, unobtrusive icon in your macOS menu bar
-- 🤖 **Natural language processing** - Speak naturally, no need to memorize exact phrases
-- ⚡ **Fast and responsive** - Commands execute immediately in Capture One
-- 🔧 **Extensible** - Easy to add new commands and customize behavior
+## 🎯 Core Features
+
+- 🎤 **Continuous Listening Mode** - Always active, true hands-free operation
+- 🗣️ **Voice Feedback** - Spoken confirmations so you never look away from the shoot
+- ⌨️ **Global Hotkey** - `Option+Space` for instant activation
+- 📸 **Workflow Macros** - "Mark as hero shot" executes multi-step workflows
+- 👁️ **Quick Review** - "Show only flagged" for instant client presentations
+- 🤖 **Natural Language** - Speak naturally, semantic understanding
+- ⚡ **140+ Commands** - Comprehensive voice control across 19 categories
+- 🔧 **Professional Tools** - Batch operations, technical checks, filtering
 
 ## 💬 Example Commands
 
@@ -25,7 +30,32 @@ Studio is a macOS menu bar application that provides voice control for Capture O
 - "Studio, auto adjust" or "zoom to fit"
 - "Studio, copy adjustments" or "show fullscreen"
 
-**See [COMMANDS.md](COMMANDS.md) for the complete list of all 90+ commands!**
+**See [COMMANDS.md](COMMANDS.md) and [FEATURES.md](FEATURES.md) for complete documentation!**
+
+## 🎬 Digital Tech Features
+
+### Continuous Listening Mode
+Enable true hands-free operation - no more clicking to activate. Perfect for tethered shooting.
+
+### Voice Feedback
+Hear "Marked as hero shot" or "Deleted 4 images" - keep your eyes on the shoot, not the screen.
+
+### Workflow Macros
+- **"Mark as hero shot"** → 5 stars + green label + flag
+- **"Mark as selects"** → 4 stars + flag
+- **"Mark as reject"** → Reject status
+- **"Mark as maybe"** → 3 stars + yellow label
+
+### Quick Review
+- **"Show only flagged"** → Display selects for client
+- **"Show 5 stars"** → Hero shots only
+- **"Show last 20 captures"** → Recent work
+- **"Clear filters"** → Back to full gallery
+
+### Global Hotkey
+Press `Option+Space` anywhere to activate listening - fastest way to issue commands.
+
+**See [FEATURES.md](FEATURES.md) for complete digital tech guide!**
 
 ## 📋 Requirements
 

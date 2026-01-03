@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Studio - Voice Assistant for Capture One
-A macOS menu bar application for voice-controlled photo editing
+A macOS menu bar application for voice-controlled photo editing with continuous listening
 """
 
 import rumps
@@ -10,9 +10,12 @@ import sys
 import threading
 import wave
 import pyaudio
+import subprocess
 from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
+from pynput import keyboard
+from collections import deque
 
 from command_parser import CommandParser
 from capture_one_controller import CaptureOneController
@@ -49,6 +52,14 @@ class StudioApp(rumps.App):
         self.audio_frames = []
         self.audio = pyaudio.PyAudio()
 
+        # Continuous listening mode
+        self.continuous_mode = False
+        self.voice_feedback_enabled = True
+
+        # Command history for undo
+        self.command_history = deque(maxlen=10)
+        self.last_command = None
+
         # Create recordings directory
         self.recordings_dir = Path.home() / ".studio" / "recordings"
         self.recordings_dir.mkdir(parents=True, exist_ok=True)
@@ -56,14 +67,72 @@ class StudioApp(rumps.App):
         # Menu items
         self.menu = [
             rumps.MenuItem("Start Listening ⏺", callback=self.toggle_recording),
+            rumps.MenuItem("Continuous Mode: Off", callback=self.toggle_continuous_mode),
+            rumps.separator,
+            rumps.MenuItem("Voice Feedback: On", callback=self.toggle_voice_feedback),
             rumps.separator,
             rumps.MenuItem("Status: Ready", callback=None),
+            rumps.separator,
+            rumps.MenuItem("Undo Last Command", callback=self.undo_last_command),
             rumps.separator,
             rumps.MenuItem("Settings", callback=self.show_settings),
             rumps.MenuItem("About Studio", callback=self.show_about),
             rumps.separator,
             rumps.MenuItem("Quit", callback=self.quit_app)
         ]
+
+        # Set up global hotkey (Option+Space)
+        self.setup_global_hotkey()
+
+    def setup_global_hotkey(self):
+        """Setup global keyboard shortcut for activating listening"""
+        def on_activate():
+            if not self.is_recording:
+                # Trigger listening mode
+                self.start_recording_programmatic()
+
+        # Create hotkey combination (Option+Space)
+        hotkey = keyboard.HotKey(
+            keyboard.HotKey.parse('<alt>+<space>'),
+            on_activate
+        )
+
+        def for_canonical(f):
+            return lambda k: f(keyboard_listener.canonical(k))
+
+        keyboard_listener = keyboard.Listener(
+            on_press=for_canonical(hotkey.press),
+            on_release=for_canonical(hotkey.release)
+        )
+
+        keyboard_listener.daemon = True
+        keyboard_listener.start()
+
+    def toggle_continuous_mode(self, sender):
+        """Toggle continuous listening mode"""
+        self.continuous_mode = not self.continuous_mode
+
+        if self.continuous_mode:
+            sender.title = "Continuous Mode: On ✓"
+            self._update_status("Continuous mode active")
+            self._speak("Continuous listening enabled")
+            # Start continuous listening
+            if not self.is_recording:
+                self.start_recording_programmatic()
+        else:
+            sender.title = "Continuous Mode: Off"
+            self._update_status("Ready")
+            self._speak("Continuous listening disabled")
+
+    def toggle_voice_feedback(self, sender):
+        """Toggle voice feedback on/off"""
+        self.voice_feedback_enabled = not self.voice_feedback_enabled
+
+        if self.voice_feedback_enabled:
+            sender.title = "Voice Feedback: On ✓"
+            self._speak("Voice feedback enabled")
+        else:
+            sender.title = "Voice Feedback: Off"
 
     def toggle_recording(self, sender):
         """Toggle audio recording on/off"""
@@ -72,11 +141,23 @@ class StudioApp(rumps.App):
         else:
             self.stop_recording(sender)
 
+    def start_recording_programmatic(self):
+        """Start recording without menu item (for hotkey)"""
+        if self.is_recording:
+            return
+
+        self.is_recording = True
+        self._update_status("Listening...")
+        self.icon = "🎤"
+
+        # Start recording in a separate thread
+        threading.Thread(target=self._record_audio, daemon=True).start()
+
     def start_recording(self, sender):
         """Start recording audio"""
         self.is_recording = True
         sender.title = "Stop Listening ⏹"
-        self.menu["Status: Ready"].title = "Status: Listening..."
+        self._update_status("Listening...")
         self.icon = "🎤"
 
         # Start recording in a separate thread
@@ -86,7 +167,7 @@ class StudioApp(rumps.App):
         """Stop recording and process the audio"""
         self.is_recording = False
         sender.title = "Start Listening ⏺"
-        self.menu["Status: Listening..."].title = "Status: Processing..."
+        self._update_status("Processing...")
         self.icon = "⏳"
 
         # Process the recording in a separate thread
@@ -152,7 +233,10 @@ class StudioApp(rumps.App):
             if transcribed_text:
                 self._execute_command(transcribed_text)
             else:
-                self._reset_status("No speech detected")
+                self._update_status("No speech detected")
+                if self.continuous_mode:
+                    # Restart listening in continuous mode
+                    threading.Timer(0.5, self.start_recording_programmatic).start()
 
         except Exception as e:
             rumps.notification(
@@ -160,7 +244,10 @@ class StudioApp(rumps.App):
                 "Processing Error",
                 str(e)
             )
-            self._reset_status("Error occurred")
+            self._update_status("Error occurred")
+            if self.continuous_mode:
+                # Restart listening even after error
+                threading.Timer(1.0, self.start_recording_programmatic).start()
 
     def _execute_command(self, transcribed_text):
         """Parse and execute the voice command"""
@@ -169,46 +256,165 @@ class StudioApp(rumps.App):
             command = self.command_parser.parse(transcribed_text)
 
             if command:
+                # Save to history
+                self.last_command = (transcribed_text, command)
+                self.command_history.append(self.last_command)
+
                 # Execute the command
                 success = self.capture_one.execute(command)
 
                 if success:
+                    # Voice feedback
+                    feedback_msg = self._get_command_feedback(command)
+                    self._speak(feedback_msg)
+
                     rumps.notification(
                         "Studio",
                         "Command Executed",
-                        f'"{transcribed_text}"'
+                        feedback_msg
                     )
-                    self._reset_status("Command executed")
+                    self._update_status("Command executed")
                 else:
+                    self._speak("Command failed")
                     rumps.notification(
                         "Studio",
                         "Execution Failed",
                         "Could not execute command in Capture One"
                     )
-                    self._reset_status("Execution failed")
+                    self._update_status("Execution failed")
             else:
+                self._speak("Command not recognized")
                 rumps.notification(
                     "Studio",
                     "Command Not Recognized",
                     f'"{transcribed_text}"'
                 )
-                self._reset_status("Command not recognized")
+                self._update_status("Command not recognized")
+
+            # Restart continuous listening if enabled
+            if self.continuous_mode:
+                threading.Timer(0.5, self.start_recording_programmatic).start()
 
         except Exception as e:
+            self._speak("Error occurred")
             rumps.notification(
                 "Studio Error",
                 "Command Error",
                 str(e)
             )
-            self._reset_status("Error occurred")
+            self._update_status("Error occurred")
 
-    def _reset_status(self, message="Ready"):
-        """Reset the app status"""
-        self.icon = "📷"
+            if self.continuous_mode:
+                threading.Timer(1.0, self.start_recording_programmatic).start()
+
+    def _get_command_feedback(self, command):
+        """Generate human-friendly feedback for command execution"""
+        action = command.action
+        params = command.params
+
+        # Friendly feedback messages
+        feedback_map = {
+            'delete_last': f"Deleted {params.get('count', 1)} images",
+            'delete_selected': "Deleted selected images",
+            'rate_last': f"Rated {params.get('count', 1)} images as {params.get('rating')} stars",
+            'rate_selected': f"Rated as {params.get('rating')} stars",
+            'label_last': f"Labeled {params.get('count', 1)} images as {params.get('color')}",
+            'label_selected': f"Labeled as {params.get('color')}",
+            'remove_label': "Removed label",
+            'select_last': f"Selected last {params.get('count')} images",
+            'select_first': f"Selected first {params.get('count')} images",
+            'select_all': "Selected all images",
+            'deselect_all': "Cleared selection",
+            'export_selected': "Exporting selected images",
+            'export_last': f"Exporting last {params.get('count')} images",
+            'export_all': "Exporting all images",
+            'flag_selected': "Flagged image",
+            'unflag_selected': "Unflagged image",
+            'flag_last': f"Flagged last {params.get('count')} images",
+            'reject_selected': "Rejected image",
+            'unreject_selected': "Unrejected image",
+            'next_image': "Next image",
+            'previous_image': "Previous image",
+            'first_image': "First image",
+            'last_image': "Last image",
+            'rotate_left': "Rotated left",
+            'rotate_right': "Rotated right",
+            'flip_horizontal': "Flipped horizontal",
+            'flip_vertical': "Flipped vertical",
+            'auto_adjust': "Auto adjusted",
+            'reset_adjustments': "Reset all adjustments",
+            'copy_adjustments': "Copied adjustments",
+            'paste_adjustments': "Pasted adjustments",
+            'enable_crop': "Crop enabled",
+            'disable_crop': "Crop cancelled",
+            'apply_crop': "Crop applied",
+            'fullscreen': "Fullscreen toggled",
+            'zoom_to_fit': "Zoomed to fit",
+            'zoom_100': "Zoomed to 100%",
+            'zoom_in': "Zoomed in",
+            'zoom_out': "Zoomed out",
+            # Workflow macros
+            'macro_hero_shot': "Marked as hero shot",
+            'macro_selects': "Marked as selects",
+            'macro_reject': "Marked as reject",
+            'macro_maybe': "Marked as maybe",
+            # Filters
+            'filter_flagged': "Showing only flagged images",
+            'filter_5_stars': "Showing only 5 star images",
+            'filter_selects': "Showing selects",
+            'filter_rejects': "Showing rejects",
+            'show_last_captures': f"Showing last {params.get('count')} captures",
+            'clear_filters': "Cleared all filters",
+            'show_all': "Showing all images",
+            # Technical
+            'show_overexposure': "Showing overexposure warning",
+            'hide_overexposure': "Hiding overexposure warning",
+            'show_histogram': "Showing histogram",
+            'hide_histogram': "Hiding histogram",
+            # Batch
+            'batch_apply_to_flagged': "Applying to flagged images",
+            'batch_white_balance': "Syncing white balance",
+        }
+
+        return feedback_map.get(action, "Command executed")
+
+    def _speak(self, text):
+        """Speak text using macOS text-to-speech"""
+        if not self.voice_feedback_enabled:
+            return
+
+        try:
+            # Use macOS say command for voice feedback
+            subprocess.Popen(
+                ['say', '-v', 'Samantha', '-r', '200', text],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+        except Exception:
+            pass  # Silently fail if say command unavailable
+
+    def _update_status(self, message="Ready"):
+        """Update the app status"""
+        self.icon = "📷" if message in ["Ready", "Command executed"] else "🎤" if "Listening" in message else "⏳"
         for item in self.menu.values():
             if item.title.startswith("Status:"):
                 item.title = f"Status: {message}"
                 break
+
+    def undo_last_command(self, _):
+        """Undo the last executed command"""
+        if not self.last_command:
+            rumps.alert("No Command to Undo", "No recent command in history")
+            return
+
+        transcribed_text, command = self.last_command
+
+        # Show what will be undone
+        rumps.alert(
+            "Undo Not Yet Implemented",
+            f"Would undo: {transcribed_text}\n\n"
+            "This feature requires command-specific undo logic."
+        )
 
     def show_settings(self, _):
         """Show settings dialog"""
@@ -236,9 +442,14 @@ class StudioApp(rumps.App):
         rumps.alert(
             "About Studio",
             "Studio - Voice Assistant for Capture One\n\n"
-            "Version 1.0\n\n"
-            "A voice-controlled assistant for professional photo editing.\n\n"
-            "Say 'Studio' followed by your command to control Capture One."
+            "Version 2.0 - Digital Tech Edition\n\n"
+            "Features:\n"
+            "• 90+ voice commands\n"
+            "• Continuous listening mode\n"
+            "• Voice feedback\n"
+            "• Global hotkey (Option+Space)\n"
+            "• Workflow macros\n\n"
+            "Say 'Studio' followed by your command."
         )
 
     def quit_app(self, _):

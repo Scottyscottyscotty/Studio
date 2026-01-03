@@ -433,6 +433,118 @@ class CommandParser:
                 'action': 'hide_focus_mask',
                 'params': lambda m: {}
             },
+
+            # ============================================================
+            # WORKFLOW MACRO COMMANDS
+            # ============================================================
+            # Hero shot - 5 stars + green label + flag
+            {
+                'pattern': r'(?:mark|tag|set)\s+(?:as\s+)?(?:hero|keeper|best)(?:\s+shot)?',
+                'action': 'macro_hero_shot',
+                'params': lambda m: {}
+            },
+            # Selects - 4 stars + flag
+            {
+                'pattern': r'(?:mark|tag|set)\s+(?:as\s+)?(?:select|selects|good)',
+                'action': 'macro_selects',
+                'params': lambda m: {}
+            },
+            # Rejects - reject + 1 star
+            {
+                'pattern': r'(?:mark|tag|set)\s+(?:as\s+)?(?:reject|bad|trash|dud)(?:s)?',
+                'action': 'macro_reject',
+                'params': lambda m: {}
+            },
+            # Maybe - 3 stars + yellow label
+            {
+                'pattern': r'(?:mark|tag|set)\s+(?:as\s+)?(?:maybe|review|check)',
+                'action': 'macro_maybe',
+                'params': lambda m: {}
+            },
+
+            # ============================================================
+            # QUICK REVIEW/FILTER COMMANDS
+            # ============================================================
+            # Show only flagged
+            {
+                'pattern': r'(?:show|display|view)\s+(?:only\s+)?(?:flagged|favorites|starred)(?:\s+images)?',
+                'action': 'filter_flagged',
+                'params': lambda m: {}
+            },
+            # Show only 5 stars
+            {
+                'pattern': r'(?:show|display|view)\s+(?:only\s+)?(?:5|five)\s+star(?:s)?(?:\s+images)?',
+                'action': 'filter_5_stars',
+                'params': lambda m: {}
+            },
+            # Show only 4+ stars (selects)
+            {
+                'pattern': r'(?:show|display|view)\s+(?:only\s+)?(?:selects|4 plus|four plus)',
+                'action': 'filter_selects',
+                'params': lambda m: {}
+            },
+            # Show only rejects
+            {
+                'pattern': r'(?:show|display|view)\s+(?:only\s+)?reject(?:s|ed)?(?:\s+images)?',
+                'action': 'filter_rejects',
+                'params': lambda m: {}
+            },
+            # Show last N captures
+            {
+                'pattern': r'(?:show|display|view)\s+(?:the\s+)?last\s+(\d+)\s+capture(?:s)?',
+                'action': 'show_last_captures',
+                'params': lambda m: {'count': int(m.group(1))}
+            },
+            # Clear all filters
+            {
+                'pattern': r'(?:clear|remove|reset)\s+(?:all\s+)?filter(?:s)?',
+                'action': 'clear_filters',
+                'params': lambda m: {}
+            },
+            # Show all images
+            {
+                'pattern': r'(?:show|display|view)\s+(?:all|everything)',
+                'action': 'show_all',
+                'params': lambda m: {}
+            },
+
+            # ============================================================
+            # EXPOSURE/TECHNICAL CHECK COMMANDS
+            # ============================================================
+            {
+                'pattern': r'(?:show|enable|display)\s+(?:overexposure|clipping)\s+(?:warning|indicator)',
+                'action': 'show_overexposure',
+                'params': lambda m: {}
+            },
+            {
+                'pattern': r'(?:hide|disable)\s+(?:overexposure|clipping)\s+(?:warning|indicator)',
+                'action': 'hide_overexposure',
+                'params': lambda m: {}
+            },
+            {
+                'pattern': r'(?:show|enable|display)\s+histogram',
+                'action': 'show_histogram',
+                'params': lambda m: {}
+            },
+            {
+                'pattern': r'(?:hide|disable)\s+histogram',
+                'action': 'hide_histogram',
+                'params': lambda m: {}
+            },
+
+            # ============================================================
+            # BATCH OPERATIONS
+            # ============================================================
+            {
+                'pattern': r'(?:apply|sync)\s+(?:these\s+)?(?:settings|adjustments|edits)\s+to\s+(?:all\s+)?(?:flagged|selected)',
+                'action': 'batch_apply_to_flagged',
+                'params': lambda m: {}
+            },
+            {
+                'pattern': r'(?:apply|sync)\s+white\s+balance\s+to\s+(?:all\s+)?(?:flagged|selected)',
+                'action': 'batch_white_balance',
+                'params': lambda m: {}
+            },
         ]
 
     def parse(self, text: str) -> Optional[Command]:

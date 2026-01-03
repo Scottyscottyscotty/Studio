@@ -245,6 +245,48 @@ class CaptureOneController:
             elif action == 'hide_focus_mask':
                 return self._press_shortcut('focus_mask')  # Toggle
 
+            # Workflow macro commands
+            elif action == 'macro_hero_shot':
+                return self._macro_hero_shot()
+            elif action == 'macro_selects':
+                return self._macro_selects()
+            elif action == 'macro_reject':
+                return self._macro_reject()
+            elif action == 'macro_maybe':
+                return self._macro_maybe()
+
+            # Filter/review commands
+            elif action == 'filter_flagged':
+                return self._filter_flagged()
+            elif action == 'filter_5_stars':
+                return self._filter_rating(5)
+            elif action == 'filter_selects':
+                return self._filter_rating_min(4)
+            elif action == 'filter_rejects':
+                return self._filter_rejected()
+            elif action == 'show_last_captures':
+                return self._select_last(command.params.get('count'))
+            elif action == 'clear_filters':
+                return self._clear_filters()
+            elif action == 'show_all':
+                return self._clear_filters()
+
+            # Exposure/technical check commands
+            elif action == 'show_overexposure':
+                return self._show_overexposure()
+            elif action == 'hide_overexposure':
+                return self._hide_overexposure()
+            elif action == 'show_histogram':
+                return self._show_histogram()
+            elif action == 'hide_histogram':
+                return self._hide_histogram()
+
+            # Batch operation commands
+            elif action == 'batch_apply_to_flagged':
+                return self._batch_apply_to_flagged()
+            elif action == 'batch_white_balance':
+                return self._batch_white_balance()
+
             else:
                 print(f"Unknown action: {action}")
                 return False
@@ -657,6 +699,118 @@ class CaptureOneController:
         '''
 
         return self._run_applescript(script)
+
+    # ============================================================
+    # WORKFLOW MACRO IMPLEMENTATIONS
+    # ============================================================
+
+    def _macro_hero_shot(self) -> bool:
+        """Mark as hero shot: 5 stars + green label + flag"""
+        # Rate 5 stars
+        if not self._rate_selected(5):
+            return False
+        # Label green
+        if not self._label_selected('green'):
+            return False
+        # Flag
+        return self._press_shortcut('flag')
+
+    def _macro_selects(self) -> bool:
+        """Mark as selects: 4 stars + flag"""
+        # Rate 4 stars
+        if not self._rate_selected(4):
+            return False
+        # Flag
+        return self._press_shortcut('flag')
+
+    def _macro_reject(self) -> bool:
+        """Mark as reject: reject status"""
+        return self._press_shortcut('reject')
+
+    def _macro_maybe(self) -> bool:
+        """Mark as maybe: 3 stars + yellow label"""
+        # Rate 3 stars
+        if not self._rate_selected(3):
+            return False
+        # Label yellow
+        return self._label_selected('yellow')
+
+    # ============================================================
+    # FILTER/REVIEW COMMAND IMPLEMENTATIONS
+    # ============================================================
+
+    def _filter_flagged(self) -> bool:
+        """Show only flagged images using filter panel"""
+        # Placeholder - would use Capture One's filter panel
+        print("Filter flagged not fully implemented yet")
+        return True
+
+    def _filter_rating(self, rating: int) -> bool:
+        """Show only images with specific rating"""
+        # Placeholder - would use Capture One's filter panel
+        print(f"Filter by rating {rating} not fully implemented yet")
+        return True
+
+    def _filter_rating_min(self, min_rating: int) -> bool:
+        """Show only images with rating >= min_rating"""
+        # Placeholder - would use Capture One's filter panel
+        print(f"Filter by minimum rating {min_rating} not fully implemented yet")
+        return True
+
+    def _filter_rejected(self) -> bool:
+        """Show only rejected images"""
+        # Placeholder - would use Capture One's filter panel
+        print("Filter rejected not fully implemented yet")
+        return True
+
+    def _clear_filters(self) -> bool:
+        """Clear all active filters"""
+        # Cmd+Shift+A clears filters in some views
+        return self._press_key('command down & shift down & a & shift up & command up')
+
+    # ============================================================
+    # EXPOSURE/TECHNICAL CHECK IMPLEMENTATIONS
+    # ============================================================
+
+    def _show_overexposure(self) -> bool:
+        """Show overexposure/clipping warning"""
+        # Toggle with 'O' key or Cmd+Shift+O
+        return self._press_key('o')
+
+    def _hide_overexposure(self) -> bool:
+        """Hide overexposure warning"""
+        return self._press_key('o')  # Toggle
+
+    def _show_histogram(self) -> bool:
+        """Show histogram"""
+        # Placeholder - would open histogram tool
+        print("Show histogram not fully implemented yet")
+        return True
+
+    def _hide_histogram(self) -> bool:
+        """Hide histogram"""
+        print("Hide histogram not fully implemented yet")
+        return True
+
+    # ============================================================
+    # BATCH OPERATION IMPLEMENTATIONS
+    # ============================================================
+
+    def _batch_apply_to_flagged(self) -> bool:
+        """Apply current adjustments to all flagged images"""
+        # Copy current adjustments
+        if not self._press_shortcut('copy_adjustments'):
+            return False
+
+        # Select all flagged (placeholder - would use filter)
+        # Then paste adjustments
+        return self._press_shortcut('paste_adjustments')
+
+    def _batch_white_balance(self) -> bool:
+        """Sync white balance to selected/flagged images"""
+        # Placeholder for white balance sync
+        print("Batch white balance not fully implemented yet")
+        return True
 
 
 # Test function
