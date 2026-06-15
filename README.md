@@ -1,8 +1,10 @@
 # Studio - Voice Assistant for Capture One
 
-## Digital Tech Edition - Professional On-Set Voice Control
+## Version 2.1 - June 2026 Update
 
 Studio is a macOS menu bar application that provides hands-free voice control for Capture One Pro. Designed specifically to replace a digital technician on photoshoot sets with continuous listening, voice feedback, and workflow macros.
+
+**✨ New in 2.1:** Upgraded to OpenAI SDK 2.41.0, improved TTS debugging, 5-second recording timeout, better error handling, and centralized configuration.
 
 ## 🎯 Core Features
 
@@ -60,10 +62,17 @@ Press `Option+Space` anywhere to activate listening - fastest way to issue comma
 ## 📋 Requirements
 
 - **macOS 12.0 or later**
-- **Python 3.8 or later**
+- **Python 3.9 or later** (Python 3.13+ recommended)
 - **Capture One Pro** (any recent version)
-- **OpenAI API key** with Whisper API access
+- **OpenAI API key** with Whisper and TTS API access
 - **Homebrew** (recommended for easy PortAudio installation)
+
+### Recommended System
+
+- macOS 13.0+ (Ventura or later)
+- Python 3.13+
+- Capture One 16.x
+- Microphone with good quality (built-in Mac mic works fine)
 
 ## 🚀 Installation
 
@@ -220,10 +229,28 @@ Default Capture One shortcuts are used. If you've customized your shortcuts, you
 
 Studio is built with:
 - **rumps** - macOS menu bar application framework
-- **OpenAI Whisper API** - Speech-to-text transcription
-- **pyaudio** - Audio recording
+- **OpenAI Whisper API** - Speech-to-text transcription (Whisper-1 model)
+- **OpenAI TTS API** - Text-to-speech feedback (TTS-1 model, nova voice)
+- **pyaudio** - Audio recording (16kHz mono)
 - **AppleScript** - Capture One automation
-- **Python 3** - Core application logic
+- **Python 3.9+** - Core application logic
+
+### Voice Pipeline
+
+1. **Audio Capture** → pyaudio records from microphone at 16kHz mono
+2. **Transcription** → OpenAI Whisper-1 converts speech to text
+3. **Parsing** → Regex-based parser with 140+ patterns
+4. **Execution** → AppleScript sends keyboard shortcuts to Capture One
+5. **Feedback** → OpenAI TTS-1 speaks confirmation with nova voice at 1.2x speed
+
+### Cost Analysis
+
+Typical usage costs (60 commands/hour):
+- **Whisper-1:** ~5 min audio @ $0.006/min = $0.03
+- **TTS-1:** ~1,200 characters @ $15/1M = $0.02
+- **Total:** ~$0.05 per hour of active use
+
+Very cost-effective for individual photographers!
 
 ### Project Structure
 
@@ -256,9 +283,20 @@ If you get a microphone permission error:
 
 ### OpenAI API Errors
 
-- Verify your API key is correct in `.env`
-- Check you have sufficient API credits
-- Ensure you have access to the Whisper API
+- Verify your API key is correct in `.env` (not `.env.example`!)
+- Check you have sufficient API credits at https://platform.openai.com/usage
+- Ensure you have access to the Whisper and TTS APIs
+- Look for `[DEBUG]` and `[ERROR]` messages in the terminal for details
+- API key format should be: `OPENAI_API_KEY=sk-proj-...` (no quotes, no spaces)
+
+### TTS Not Working / Hearing Mac Voice
+
+If you hear the default Mac "Samantha" voice instead of OpenAI's nova voice:
+1. Check terminal for `[DEBUG] TTS:` and `[ERROR] TTS` messages
+2. Verify your OpenAI API key has TTS API access
+3. Check API usage limits at https://platform.openai.com/usage
+4. Make sure you're using openai>=2.41.0 (run `pip show openai`)
+5. Try regenerating your API key
 
 ### No Sound Recording
 
@@ -266,17 +304,60 @@ If you get a microphone permission error:
 - Check that your microphone is working in other apps
 - Grant microphone permissions in System Preferences
 
+### Commands Timing Out
+
+If recordings end before you finish speaking:
+- Edit the timeout in `studio.py` Config class
+- Change `MENU_RECORDING_TIMEOUT` and `PROGRAMMATIC_RECORDING_TIMEOUT` (default: 5 seconds)
+- Restart Studio after changes
+
+### Dependency Installation Fails
+
+If you have Python 3.13 compatibility issues:
+```bash
+# Upgrade pip first
+pip install --upgrade pip
+
+# Install dependencies one at a time to isolate issues
+pip install rumps
+pip install openai
+pip install pyaudio  # May need: brew install portaudio first
+pip install python-dotenv
+pip install pyobjc-framework-Cocoa
+pip install pynput
+```
+
+### Debug Mode
+
+For detailed debugging, watch the terminal output:
+- `[DEBUG]` messages show normal operations
+- `[ERROR]` messages show failures
+- Look for API response times, file sizes, and error tracebacks
+
 ## 🛣️ Roadmap
 
-Future enhancements planned:
+### Completed ✅
+- [✅] Continuous listening mode
+- [✅] Voice feedback/responses (OpenAI TTS)
+- [✅] Batch operations
+- [✅] Preset command macros (hero shot, selects, reject, maybe)
+- [✅] Keyboard shortcut (Option+Space) - temporarily disabled for Python 3.13 compatibility
+- [✅] 140+ commands with natural language understanding
+
+### In Progress 🚧
+- [ ] Re-enable global hotkey for Python 3.13
+- [ ] Unit and integration tests
+- [ ] CI/CD pipeline
+
+### Future Enhancements 🔮
 - [ ] Custom wake word support
-- [ ] Continuous listening mode
-- [ ] Voice feedback/responses
-- [ ] Batch operations
-- [ ] Preset command macros
-- [ ] Integration with other photo editing apps
-- [ ] Keyboard shortcut for quick activation
+- [ ] Migration to GPT-Realtime-Whisper for streaming (lower latency)
+- [ ] Command confirmation mode for destructive operations
+- [ ] Command analytics and workflow insights
+- [ ] Integration with other photo editing apps (Lightroom, Photoshop)
 - [ ] Packaged .app bundle for easy installation
+- [ ] Multi-language support beyond English
+- [ ] Cloud sync for command history
 
 ## 🤝 Contributing
 

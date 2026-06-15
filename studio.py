@@ -11,6 +11,8 @@ import threading
 import wave
 import pyaudio
 import subprocess
+import tempfile
+import time
 from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -22,6 +24,36 @@ from capture_one_controller import CaptureOneController
 
 # Load environment variables
 load_dotenv()
+
+
+# Configuration Constants
+class Config:
+    """Application configuration"""
+    VERSION = "2.1"
+
+    # Audio Recording
+    AUDIO_CHUNK_SIZE = 1024
+    AUDIO_FORMAT = pyaudio.paInt16
+    AUDIO_CHANNELS = 1
+    AUDIO_SAMPLE_RATE = 16000
+
+    # Recording Timeouts (seconds)
+    MENU_RECORDING_TIMEOUT = 5
+    PROGRAMMATIC_RECORDING_TIMEOUT = 5
+
+    # OpenAI API
+    WHISPER_MODEL = "whisper-1"
+    WHISPER_LANGUAGE = "en"
+    API_TIMEOUT = 30.0
+
+    # Text-to-Speech
+    TTS_MODEL = "tts-1"
+    TTS_VOICE = "nova"  # Options: alloy, echo, fable, onyx, nova, shimmer
+    TTS_SPEED = 1.2
+    TTS_CLEANUP_DELAY = 5.0
+
+    # Command History
+    MAX_COMMAND_HISTORY = 10
 
 
 class StudioApp(rumps.App):
@@ -41,7 +73,7 @@ class StudioApp(rumps.App):
             )
             sys.exit(1)
 
-        self.openai_client = OpenAI(api_key=api_key, timeout=30.0)
+        self.openai_client = OpenAI(api_key=api_key, timeout=Config.API_TIMEOUT)
 
         # Test API key validity at startup
         print(f"[DEBUG] API key loaded: {api_key[:20]}...{api_key[-4:]}")
@@ -71,7 +103,7 @@ class StudioApp(rumps.App):
         self.voice_feedback_enabled = True
 
         # Command history for undo
-        self.command_history = deque(maxlen=10)
+        self.command_history = deque(maxlen=Config.MAX_COMMAND_HISTORY)
         self.last_command = None
 
         # Create recordings directory
@@ -168,8 +200,8 @@ class StudioApp(rumps.App):
         # Start recording in a separate thread
         threading.Thread(target=self._record_audio, daemon=True).start()
 
-        # Auto-stop after 5 seconds for programmatic recording
-        threading.Timer(5.0, self._stop_recording_programmatic).start()
+        # Auto-stop after configured timeout for programmatic recording
+        threading.Timer(Config.PROGRAMMATIC_RECORDING_TIMEOUT, self._stop_recording_programmatic).start()
 
     def start_recording(self, sender):
         """Start recording audio"""
@@ -183,8 +215,8 @@ class StudioApp(rumps.App):
         # Start recording in a separate thread
         threading.Thread(target=self._record_audio, daemon=True).start()
 
-        # Auto-stop after 10 seconds for menu-based recording
-        threading.Timer(10.0, self._auto_stop_menu_recording).start()
+        # Auto-stop after configured timeout for menu-based recording
+        threading.Timer(Config.MENU_RECORDING_TIMEOUT, self._auto_stop_menu_recording).start()
 
     def stop_recording(self, sender):
         """Stop recording and process the audio"""
@@ -202,7 +234,7 @@ class StudioApp(rumps.App):
         if not self.is_recording:
             return
 
-        print("[DEBUG] Auto-stopping menu recording after 10 seconds")
+        print("[DEBUG] Auto-stopping menu recording after 5 seconds")
         self.is_recording = False
 
         # Update menu item if we have the sender
@@ -229,20 +261,15 @@ class StudioApp(rumps.App):
 
     def _record_audio(self):
         """Record audio from the microphone"""
-        CHUNK = 1024
-        FORMAT = pyaudio.paInt16
-        CHANNELS = 1
-        RATE = 16000
-
         self.audio_frames = []
 
         try:
             stream = self.audio.open(
-                format=FORMAT,
-                channels=CHANNELS,
-                rate=RATE,
+                format=Config.AUDIO_FORMAT,
+                channels=Config.AUDIO_CHANNELS,
+                rate=Config.AUDIO_SAMPLE_RATE,
                 input=True,
-                frames_per_buffer=CHUNK
+                frames_per_buffer=Config.AUDIO_CHUNK_SIZE
             )
 
             while self.is_recording:
@@ -275,9 +302,9 @@ class StudioApp(rumps.App):
             audio_file_path = self.recordings_dir / "temp_recording.wav"
 
             wf = wave.open(str(audio_file_path), 'wb')
-            wf.setnchannels(1)
-            wf.setsampwidth(self.audio.get_sample_size(pyaudio.paInt16))
-            wf.setframerate(16000)
+            wf.setnchannels(Config.AUDIO_CHANNELS)
+            wf.setsampwidth(self.audio.get_sample_size(Config.AUDIO_FORMAT))
+            wf.setframerate(Config.AUDIO_SAMPLE_RATE)
             wf.writeframes(b''.join(self.audio_frames))
             wf.close()
 
@@ -286,8 +313,7 @@ class StudioApp(rumps.App):
             print(f"[DEBUG] Audio saved to: {audio_file_path} (size: {file_size} bytes)")
 
             # Send to OpenAI Whisper API
-            print(f"[DEBUG] Sending to Whisper API... (timeout: 30s)")
-            import time
+            print(f"[DEBUG] Sending to Whisper API... (timeout: {Config.API_TIMEOUT}s)")
             start_time = time.time()
 
             try:
@@ -295,9 +321,9 @@ class StudioApp(rumps.App):
                     print(f"[DEBUG] File opened, calling API...")
                     # Pass file as tuple: (filename, file_object)
                     transcript = self.openai_client.audio.transcriptions.create(
-                        model="whisper-1",
+                        model=Config.WHISPER_MODEL,
                         file=("recording.wav", audio_file, "audio/wav"),
-                        language="en"
+                        language=Config.WHISPER_LANGUAGE
                     )
                     elapsed = time.time() - start_time
                     print(f"[DEBUG] API call completed in {elapsed:.2f}s")
@@ -479,37 +505,58 @@ class StudioApp(rumps.App):
         if not self.voice_feedback_enabled:
             return
 
+        print(f"[DEBUG] TTS: Starting speech for '{text[:50]}...'")
         try:
-            # Use OpenAI TTS API for voice feedback
-            import tempfile
-            from pathlib import Path
+            start_time = time.time()
 
+            print(f"[DEBUG] TTS: Calling OpenAI API...")
             # Create speech using OpenAI
             response = self.openai_client.audio.speech.create(
-                model="tts-1",
-                voice="nova",  # Options: alloy, echo, fable, onyx, nova, shimmer
+                model=Config.TTS_MODEL,
+                voice=Config.TTS_VOICE,
                 input=text,
-                speed=1.2  # Slightly faster for quick feedback
+                speed=Config.TTS_SPEED
             )
+
+            elapsed = time.time() - start_time
+            print(f"[DEBUG] TTS: API call completed in {elapsed:.2f}s")
+
+            # Check response
+            if not hasattr(response, 'content'):
+                print(f"[ERROR] TTS: Response has no content attribute. Type: {type(response)}")
+                return
+
+            content_size = len(response.content)
+            print(f"[DEBUG] TTS: Got response, content size: {content_size} bytes")
+
+            if content_size == 0:
+                print(f"[ERROR] TTS: Response content is empty")
+                return
 
             # Save to temporary file and play
             with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as temp_file:
                 temp_file.write(response.content)
                 temp_path = temp_file.name
 
+            print(f"[DEBUG] TTS: Saved to {temp_path}, playing with afplay...")
+
             # Play the audio file using afplay (macOS)
-            subprocess.Popen(
+            process = subprocess.Popen(
                 ['afplay', temp_path],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
             )
 
+            print(f"[DEBUG] TTS: afplay started (PID: {process.pid})")
+
             # Clean up temp file after a delay
-            threading.Timer(5.0, lambda: Path(temp_path).unlink(missing_ok=True)).start()
+            threading.Timer(Config.TTS_CLEANUP_DELAY, lambda: Path(temp_path).unlink(missing_ok=True)).start()
 
         except Exception as e:
-            print(f"[DEBUG] TTS error: {e}")
-            pass  # Silently fail if TTS unavailable
+            print(f"[ERROR] TTS failed: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Don't fall back to Mac voice - just fail silently
 
     def _update_status(self, message="Ready"):
         """Update the app status"""
@@ -568,14 +615,17 @@ class StudioApp(rumps.App):
         rumps.alert(
             "About Studio",
             "Studio - Voice Assistant for Capture One\n\n"
-            "Version 2.0 - Digital Tech Edition\n\n"
+            "Version 2.1 - June 2026 Update\n\n"
             "Features:\n"
-            "• 90+ voice commands\n"
+            "• 140+ voice commands across 19 categories\n"
             "• Continuous listening mode\n"
-            "• Voice feedback\n"
-            "• Global hotkey (Option+Space)\n"
-            "• Workflow macros\n\n"
-            "Say 'Studio' followed by your command."
+            "• OpenAI TTS voice feedback (nova)\n"
+            "• Workflow macros (hero shot, selects, reject, maybe)\n"
+            "• Quick review & filtering\n"
+            "• Technical checks (exposure, histogram)\n"
+            "• Batch operations\n\n"
+            "Say 'Studio' followed by your command.\n\n"
+            "Powered by OpenAI Whisper & TTS"
         )
 
     def quit_app(self, _):
