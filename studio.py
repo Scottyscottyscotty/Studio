@@ -15,7 +15,7 @@ import tempfile
 import time
 from pathlib import Path
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import OpenAI, APIError, APIConnectionError, AuthenticationError
 from pynput import keyboard
 from collections import deque
 
@@ -82,8 +82,20 @@ class StudioApp(rumps.App):
             # Quick test with models endpoint
             self.openai_client.models.list()
             print("[DEBUG] OpenAI API connection successful!")
+        except AuthenticationError as e:
+            print(f"[ERROR] Invalid API key: {e}")
+            rumps.alert(
+                "Invalid API Key",
+                "Your OpenAI API key is invalid. Please check your .env file."
+            )
+        except APIConnectionError as e:
+            print(f"[ERROR] Connection failed: {e}")
+            rumps.alert(
+                "Connection Error",
+                "Cannot connect to OpenAI. Check your internet connection."
+            )
         except Exception as e:
-            print(f"[DEBUG] OpenAI API test failed: {e}")
+            print(f"[ERROR] OpenAI API test failed: {e}")
             rumps.alert(
                 "OpenAI API Error",
                 f"Failed to connect to OpenAI API: {str(e)}"
@@ -333,9 +345,23 @@ class StudioApp(rumps.App):
 
                 transcribed_text = transcript.text.strip()
                 print(f"[DEBUG] Transcribed: '{transcribed_text}'")
+            except AuthenticationError as api_error:
+                elapsed = time.time() - start_time
+                print(f"[ERROR] Invalid API key after {elapsed:.2f}s")
+                rumps.notification("Studio Error", "Authentication Failed", "Check your OpenAI API key")
+                raise
+            except APIConnectionError as api_error:
+                elapsed = time.time() - start_time
+                print(f"[ERROR] Connection failed after {elapsed:.2f}s: {api_error}")
+                rumps.notification("Studio Error", "Network Error", "Check your internet connection")
+                raise
+            except APIError as api_error:
+                elapsed = time.time() - start_time
+                print(f"[ERROR] API error after {elapsed:.2f}s: {api_error}")
+                raise
             except Exception as api_error:
                 elapsed = time.time() - start_time
-                print(f"[DEBUG] API call failed after {elapsed:.2f}s: {type(api_error).__name__}: {str(api_error)}")
+                print(f"[ERROR] Unexpected error after {elapsed:.2f}s: {type(api_error).__name__}: {str(api_error)}")
                 raise
 
             # Parse and execute the command
@@ -521,13 +547,21 @@ class StudioApp(rumps.App):
             elapsed = time.time() - start_time
             print(f"[DEBUG] TTS: API call completed in {elapsed:.2f}s")
 
-            # Check response
-            if not hasattr(response, 'content'):
-                print(f"[ERROR] TTS: Response has no content attribute. Type: {type(response)}")
+            # Handle both streaming and direct responses (OpenAI SDK 2.x compatibility)
+            if hasattr(response, 'read'):
+                # Streaming response
+                content = response.read()
+                print(f"[DEBUG] TTS: Read streaming response")
+            elif hasattr(response, 'content'):
+                # Direct response
+                content = response.content
+                print(f"[DEBUG] TTS: Got direct response")
+            else:
+                print(f"[ERROR] TTS: Response has no content or read() method. Type: {type(response)}")
                 return
 
-            content_size = len(response.content)
-            print(f"[DEBUG] TTS: Got response, content size: {content_size} bytes")
+            content_size = len(content)
+            print(f"[DEBUG] TTS: Content size: {content_size} bytes")
 
             if content_size == 0:
                 print(f"[ERROR] TTS: Response content is empty")
@@ -535,7 +569,7 @@ class StudioApp(rumps.App):
 
             # Save to temporary file and play
             with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as temp_file:
-                temp_file.write(response.content)
+                temp_file.write(content)
                 temp_path = temp_file.name
 
             print(f"[DEBUG] TTS: Saved to {temp_path}, playing with afplay...")
@@ -552,11 +586,19 @@ class StudioApp(rumps.App):
             # Clean up temp file after a delay
             threading.Timer(Config.TTS_CLEANUP_DELAY, lambda: Path(temp_path).unlink(missing_ok=True)).start()
 
+        except AuthenticationError as e:
+            print(f"[ERROR] TTS authentication failed: {e}")
+            rumps.notification("Studio Error", "TTS Auth Failed", "Check your OpenAI API key")
+        except APIConnectionError as e:
+            print(f"[ERROR] TTS connection failed: {e}")
+            # Silent fail - user gets no voice feedback
+        except APIError as e:
+            print(f"[ERROR] TTS API error: {e}")
+            # Silent fail - user gets no voice feedback
         except Exception as e:
-            print(f"[ERROR] TTS failed: {type(e).__name__}: {str(e)}")
+            print(f"[ERROR] TTS unexpected error: {type(e).__name__}: {str(e)}")
             import traceback
             traceback.print_exc()
-            # Don't fall back to Mac voice - just fail silently
 
     def _update_status(self, message="Ready"):
         """Update the app status"""
