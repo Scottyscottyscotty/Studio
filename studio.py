@@ -15,7 +15,7 @@ import tempfile
 import time
 from pathlib import Path
 from dotenv import load_dotenv
-from openai import OpenAI, APIError, APIConnectionError, AuthenticationError
+from openai import OpenAI, APIError, APIConnectionError, AuthenticationError, RateLimitError
 from pynput import keyboard
 from collections import deque
 
@@ -88,18 +88,21 @@ class StudioApp(rumps.App):
                 "Invalid API Key",
                 "Your OpenAI API key is invalid. Please check your .env file."
             )
+            sys.exit(1)  # Exit - can't continue without valid API key
         except APIConnectionError as e:
             print(f"[ERROR] Connection failed: {e}")
             rumps.alert(
                 "Connection Error",
                 "Cannot connect to OpenAI. Check your internet connection."
             )
+            sys.exit(1)  # Exit - can't continue without connection
         except Exception as e:
             print(f"[ERROR] OpenAI API test failed: {e}")
             rumps.alert(
                 "OpenAI API Error",
                 f"Failed to connect to OpenAI API: {str(e)}"
             )
+            sys.exit(1)  # Exit - unknown error, safer to stop
 
         # Initialize components
         self.command_parser = CommandParser()
@@ -348,20 +351,31 @@ class StudioApp(rumps.App):
             except AuthenticationError as api_error:
                 elapsed = time.time() - start_time
                 print(f"[ERROR] Invalid API key after {elapsed:.2f}s")
+                self._update_status("Auth error")
                 rumps.notification("Studio Error", "Authentication Failed", "Check your OpenAI API key")
-                raise
+                return  # Don't raise - let outer handler restart continuous mode
+            except RateLimitError as api_error:
+                elapsed = time.time() - start_time
+                print(f"[ERROR] Rate limit exceeded after {elapsed:.2f}s: {api_error}")
+                self._update_status("Rate limited")
+                rumps.notification("Studio Error", "Rate Limit", "Too many requests. Wait a moment.")
+                return  # Don't raise - let outer handler restart continuous mode
             except APIConnectionError as api_error:
                 elapsed = time.time() - start_time
                 print(f"[ERROR] Connection failed after {elapsed:.2f}s: {api_error}")
+                self._update_status("Network error")
                 rumps.notification("Studio Error", "Network Error", "Check your internet connection")
-                raise
+                return  # Don't raise - let outer handler restart continuous mode
             except APIError as api_error:
                 elapsed = time.time() - start_time
                 print(f"[ERROR] API error after {elapsed:.2f}s: {api_error}")
-                raise
+                self._update_status("API error")
+                rumps.notification("Studio Error", "API Error", str(api_error))
+                return  # Don't raise - let outer handler restart continuous mode
             except Exception as api_error:
                 elapsed = time.time() - start_time
                 print(f"[ERROR] Unexpected error after {elapsed:.2f}s: {type(api_error).__name__}: {str(api_error)}")
+                # This is truly unexpected - re-raise for outer handler
                 raise
 
             # Parse and execute the command
@@ -375,18 +389,20 @@ class StudioApp(rumps.App):
                     threading.Timer(0.5, self.start_recording_programmatic).start()
 
         except Exception as e:
-            print(f"[DEBUG] Error processing recording: {type(e).__name__}: {str(e)}")
+            # Only truly unexpected errors reach here (API errors return early above)
+            print(f"[ERROR] Unexpected error processing recording: {type(e).__name__}: {str(e)}")
             import traceback
             traceback.print_exc()
             rumps.notification(
                 "Studio Error",
-                "Processing Error",
-                str(e)
+                "Unexpected Error",
+                f"{type(e).__name__}: {str(e)}"
             )
             self._update_status("Error occurred")
-            if self.continuous_mode:
-                # Restart listening even after error
-                threading.Timer(1.0, self.start_recording_programmatic).start()
+
+        # Always restart continuous mode if enabled (whether success or error)
+        if self.continuous_mode:
+            threading.Timer(1.0, self.start_recording_programmatic).start()
 
     def _execute_command(self, transcribed_text):
         """Parse and execute the voice command"""
@@ -548,12 +564,12 @@ class StudioApp(rumps.App):
             print(f"[DEBUG] TTS: API call completed in {elapsed:.2f}s")
 
             # Handle both streaming and direct responses (OpenAI SDK 2.x compatibility)
-            if hasattr(response, 'read'):
-                # Streaming response
+            if hasattr(response, 'read') and callable(response.read):
+                # Streaming response - read() method is callable
                 content = response.read()
                 print(f"[DEBUG] TTS: Read streaming response")
             elif hasattr(response, 'content'):
-                # Direct response
+                # Direct response - content attribute
                 content = response.content
                 print(f"[DEBUG] TTS: Got direct response")
             else:
@@ -568,27 +584,38 @@ class StudioApp(rumps.App):
                 return
 
             # Save to temporary file and play
-            with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as temp_file:
-                temp_file.write(content)
-                temp_path = temp_file.name
+            temp_path = None
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.mp3') as temp_file:
+                    temp_file.write(content)
+                    temp_path = temp_file.name
 
-            print(f"[DEBUG] TTS: Saved to {temp_path}, playing with afplay...")
+                print(f"[DEBUG] TTS: Saved to {temp_path}, playing with afplay...")
 
-            # Play the audio file using afplay (macOS)
-            process = subprocess.Popen(
-                ['afplay', temp_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
-            )
+                # Play the audio file using afplay (macOS)
+                process = subprocess.Popen(
+                    ['afplay', temp_path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE
+                )
 
-            print(f"[DEBUG] TTS: afplay started (PID: {process.pid})")
+                print(f"[DEBUG] TTS: afplay started (PID: {process.pid})")
 
-            # Clean up temp file after a delay
-            threading.Timer(Config.TTS_CLEANUP_DELAY, lambda: Path(temp_path).unlink(missing_ok=True)).start()
+                # Clean up temp file after a delay
+                threading.Timer(Config.TTS_CLEANUP_DELAY, lambda: Path(temp_path).unlink(missing_ok=True)).start()
+
+            except OSError as e:
+                # File system error (write failed, afplay not found, etc.)
+                print(f"[ERROR] TTS file error: {e}")
+                if temp_path and Path(temp_path).exists():
+                    Path(temp_path).unlink(missing_ok=True)  # Clean up immediately on error
 
         except AuthenticationError as e:
             print(f"[ERROR] TTS authentication failed: {e}")
             rumps.notification("Studio Error", "TTS Auth Failed", "Check your OpenAI API key")
+        except RateLimitError as e:
+            print(f"[ERROR] TTS rate limited: {e}")
+            # Silent fail - just skip this TTS, don't spam user
         except APIConnectionError as e:
             print(f"[ERROR] TTS connection failed: {e}")
             # Silent fail - user gets no voice feedback
